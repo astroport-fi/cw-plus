@@ -19,3 +19,4 @@ pub use crate::bank::{Bank, BankKeeper};
 pub use crate::contracts::{Contract, ContractWrapper};
 pub use crate::executor::{AppResponse, Executor};
 pub use crate::wasm::{parse_contract_addr, Wasm, WasmKeeper};
+pub use terra_mocks::TerraMockQuerier;

@@ -8,6 +8,7 @@ use cosmwasm_std::{
 };
 use schemars::JsonSchema;
 use serde::Serialize;
+use terra_mocks::TerraMockQuerier;
 
 use crate::bank::Bank;
 use crate::contracts::Contract;
@@ -67,9 +68,10 @@ where
         block: BlockInfo,
         bank: impl Bank + 'static,
         storage: impl Storage + 'static,
+        terra_mock_querier: TerraMockQuerier,
     ) -> Self {
         App {
-            router: Router::new(bank),
+            router: Router::new(bank, terra_mock_querier),
             api: Box::new(api),
             storage: Box::new(storage),
             block,
@@ -163,16 +165,18 @@ where
 pub struct Router<C> {
     pub wasm: Box<dyn Wasm<C>>,
     pub bank: Box<dyn Bank>,
+    pub terra_mock_querier: terra_mocks::TerraMockQuerier,
 }
 
 impl<C> Router<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    pub(super) fn new(bank: impl Bank + 'static) -> Self {
+    pub(super) fn new(bank: impl Bank + 'static, terra_mock_querier: TerraMockQuerier) -> Self {
         Router {
             wasm: Box::new(WasmKeeper::new()),
             bank: Box::new(bank),
+            terra_mock_querier,
         }
     }
 
@@ -260,6 +264,13 @@ where
 {
     fn raw_query(&self, bin_request: &[u8]) -> QuerierResult {
         // TODO: we need to make a new custom type for queries
+
+        if let Ok(request) = from_slice(bin_request) {
+            if let QueryRequest::Custom(_) = &request {
+                return self.router.terra_mock_querier.handle_query(&request);
+            }
+        }
+
         let request: QueryRequest<Empty> = match from_slice(bin_request) {
             Ok(v) => v,
             Err(e) => {

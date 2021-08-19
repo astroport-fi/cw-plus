@@ -1,5 +1,5 @@
 [package]
-name = "cw-multi-test"
+name = "terra-multi-test"
 version = "0.8.0"
 authors = ["Ethan Frey <ethanfrey@users.noreply.github.com>"]
 edition = "2018"
@@ -20,6 +20,7 @@ cw0 = { path = "../../packages/cw0", version = "0.8.0" }
 cw-storage-plus = { path = "../../packages/storage-plus", version = "0.8.0"}
 cosmwasm-std = { version = "0.16.0", features = ["staking"] }
 cosmwasm-storage = { version = "0.16.0" }
+terra-mocks = {git ="https://github.com/terra-money/cosmwasm-contracts.git", branch = "bombay", package = "terra-mocks"}
 itertools = "0.10.1"
 schemars = "0.8.1"
 serde = { version = "1.0.103", default-features = false, features = ["derive"] }
