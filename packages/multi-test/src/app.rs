@@ -16,6 +16,8 @@ use crate::executor::{AppResponse, Executor};
 use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
 
+use anyhow::Result as AnyResult;
+
 pub fn next_block(block: &mut BlockInfo) {
     block.time = block.time.plus_seconds(5);
     block.height += 1;
@@ -52,7 +54,7 @@ impl<C> Executor<C> for App<C>
 where
     C: Clone + fmt::Debug + PartialEq + JsonSchema + 'static,
 {
-    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> Result<AppResponse, String> {
+    fn execute(&mut self, sender: Addr, msg: CosmosMsg<C>) -> AnyResult<AppResponse> {
         let mut all = self.execute_multi(sender, vec![msg])?;
         let res = all.pop().unwrap();
         Ok(res)
@@ -105,7 +107,7 @@ where
         &mut self,
         sender: Addr,
         msgs: Vec<CosmosMsg<C>>,
-    ) -> Result<Vec<AppResponse>, String> {
+    ) -> AnyResult<Vec<AppResponse>> {
         // we need to do some caching of storage here, once in the entry point:
         // meaning, wrap current state, all writes go to a cache, only when execute
         // returns a success do we flush it (otherwise drop it)
@@ -125,7 +127,7 @@ where
     }
 
     /// This is an "admin" function to let us adjust bank accounts
-    pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> Result<(), String> {
+    pub fn init_bank_balance(&mut self, account: &Addr, amount: Vec<Coin>) -> AnyResult<()> {
         self.router
             .bank
             .init_balance(&mut *self.storage, account, amount)
@@ -138,7 +140,7 @@ where
     }
 
     /// This allows to get `ContractData` for specific contract
-    pub fn contract_data(&self, address: &Addr) -> Result<ContractData, String> {
+    pub fn contract_data(&self, address: &Addr) -> AnyResult<ContractData> {
         self.router.wasm.contract_data(&*self.storage, address)
     }
 
@@ -149,8 +151,8 @@ where
         &mut self,
         contract_addr: U,
         msg: &T,
-    ) -> Result<AppResponse, String> {
-        let msg = to_vec(msg).map_err(|e| e.to_string())?;
+    ) -> AnyResult<AppResponse> {
+        let msg = to_vec(msg)?;
         self.router.wasm.sudo(
             &*self.api,
             contract_addr.into(),
@@ -203,7 +205,7 @@ where
         storage: &dyn Storage,
         block: &BlockInfo,
         request: QueryRequest<Empty>,
-    ) -> Result<Binary, String> {
+    ) -> AnyResult<Binary> {
         match request {
             QueryRequest::Wasm(req) => {
                 self.wasm
@@ -221,7 +223,7 @@ where
         block: &BlockInfo,
         sender: Addr,
         msg: CosmosMsg<C>,
-    ) -> Result<AppResponse, String> {
+    ) -> AnyResult<AppResponse> {
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
@@ -296,10 +298,12 @@ mod test {
         StdResult, SubMsg, WasmMsg,
     };
 
+    use crate::error::Error;
     use crate::test_helpers::contracts::{echo, hackatom, payout, reflect};
     use crate::test_helpers::{CustomMsg, EmptyMsg};
     use crate::transactions::StorageTransaction;
     use crate::BankKeeper;
+    use cosmwasm_std::{OverflowError, OverflowOperation, StdError};
 
     use super::*;
 
@@ -628,7 +632,10 @@ mod test {
         let err = app
             .execute_contract(random.clone(), reflect_addr.clone(), &msgs, &[])
             .unwrap_err();
-        assert_eq!("Overflow: Cannot Sub with 0 and 3", err.as_str());
+        assert_eq!(
+            StdError::overflow(OverflowError::new(OverflowOperation::Sub, 0, 3)),
+            err.downcast().unwrap()
+        );
 
         // first one should have been rolled-back on error (no second payment)
         let funds = get_balance(&app, &random);
@@ -1377,7 +1384,7 @@ mod test {
                 )
                 .unwrap_err();
 
-            assert_eq!(err, "Empty attribute key. Value: value");
+            assert_eq!(Error::empty_attribute_key("value"), err.downcast().unwrap(),);
         }
 
         #[test]
@@ -1407,7 +1414,7 @@ mod test {
                 )
                 .unwrap_err();
 
-            assert_eq!(err, "Empty attribute value. Key: key");
+            assert_eq!(Error::empty_attribute_value("key"), err.downcast().unwrap());
         }
 
         #[test]
@@ -1436,7 +1443,7 @@ mod test {
                 )
                 .unwrap_err();
 
-            assert_eq!(err, "Empty attribute key. Value: value");
+            assert_eq!(Error::empty_attribute_key("value"), err.downcast().unwrap());
         }
 
         #[test]
@@ -1465,7 +1472,7 @@ mod test {
                 )
                 .unwrap_err();
 
-            assert_eq!(err, "Empty attribute value. Key: key");
+            assert_eq!(Error::empty_attribute_value("key"), err.downcast().unwrap());
         }
 
         #[test]
@@ -1492,7 +1499,7 @@ mod test {
                 )
                 .unwrap_err();
 
-            assert_eq!(err, "Event type too short: e");
+            assert_eq!(Error::event_type_too_short("e"), err.downcast().unwrap());
         }
     }
 }
