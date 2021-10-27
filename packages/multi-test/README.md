@@ -1,6 +1,7 @@
 # Multi Test: Test helpers for multi-contract interactions
 
 Warning: **Alpha Software** Designed for internal use only.
+Sent funds aren't taxed as it happenes in Terra even if you set tax rates!
 
 This is used for testing cosmwasm-plus contracts, we have no API
 stability currently. We are working on refactoring it and will
