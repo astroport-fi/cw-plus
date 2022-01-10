@@ -7,7 +7,7 @@ use cw0::Duration;
 use cw20::{BalanceResponse, MinterResponse};
 use cw20_base::msg::QueryMsg;
 use cw3::Vote;
-use cw_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
+use terra_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
 
 fn mock_app() -> App {
     AppBuilder::new().build()

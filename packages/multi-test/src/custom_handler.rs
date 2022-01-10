@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Empty, Storage};
+use cosmwasm_std::{Addr, Api, Binary, BlockInfo, Coin, Empty, Storage};
 
 use anyhow::Result as AnyResult;
 use derivative::Derivative;
@@ -6,13 +6,14 @@ use std::cell::{Ref, RefCell};
 use std::ops::Deref;
 use std::rc::Rc;
 
-use crate::AppResponse;
+use crate::{AppResponse, Router};
 
 /// Custom message handler trait. Implementor of this trait is mocking environment behavior on
 /// given custom message.
 pub trait CustomHandler<ExecC = Empty, QueryC = Empty> {
     fn execute(
         &self,
+        router: &Router<ExecC, QueryC>,
         api: &dyn Api,
         storage: &mut dyn Storage,
         block: &BlockInfo,
@@ -27,6 +28,10 @@ pub trait CustomHandler<ExecC = Empty, QueryC = Empty> {
         block: &BlockInfo,
         msg: QueryC,
     ) -> AnyResult<Binary>;
+
+    fn get_taxable_coins(&self, msg: &ExecC) -> Vec<Coin>;
+
+    fn calculate_taxes(&self, coins: &[Coin]) -> AnyResult<Vec<Coin>>;
 }
 
 /// Custom handler implementation panicking on each call. Assuming, that unless specific behavior
@@ -40,6 +45,7 @@ where
 {
     fn execute(
         &self,
+        _router: &Router<ExecC, QueryC>,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
         _block: &BlockInfo,
@@ -57,6 +63,14 @@ where
         msg: QueryC,
     ) -> AnyResult<Binary> {
         panic!("Unexpected custom query {:?}", msg)
+    }
+
+    fn get_taxable_coins(&self, _msg: &ExecC) -> Vec<Coin> {
+        vec![]
+    }
+
+    fn calculate_taxes(&self, _coins: &[Coin]) -> AnyResult<Vec<Coin>> {
+        Ok(vec![])
     }
 }
 
@@ -102,6 +116,7 @@ impl<ExecC, QueryC> CachingCustomHandler<ExecC, QueryC> {
 impl<ExecC, QueryC> CustomHandler<ExecC, QueryC> for CachingCustomHandler<ExecC, QueryC> {
     fn execute(
         &self,
+        _router: &Router<ExecC, QueryC>,
         _api: &dyn Api,
         _storage: &mut dyn Storage,
         _block: &BlockInfo,
@@ -121,5 +136,13 @@ impl<ExecC, QueryC> CustomHandler<ExecC, QueryC> for CachingCustomHandler<ExecC,
     ) -> AnyResult<Binary> {
         self.state.queries.borrow_mut().push(msg);
         Ok(Binary::default())
+    }
+
+    fn get_taxable_coins(&self, _msg: &ExecC) -> Vec<Coin> {
+        vec![]
+    }
+
+    fn calculate_taxes(&self, _coins: &[Coin]) -> AnyResult<Vec<Coin>> {
+        Ok(vec![])
     }
 }

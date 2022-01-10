@@ -741,7 +741,7 @@ where
             .range(storage, None, None, Order::Ascending)
             .count();
         // we make this longer so it is not rejected by tests
-        Addr::unchecked(format!("Contract #{}", count.to_string()))
+        Addr::unchecked(format!("contract #{}", count.to_string()))
     }
 
     fn contract_namespace(&self, contract: &Addr) -> Vec<u8> {
@@ -962,7 +962,7 @@ mod test {
 
         // Default error message from router when not found
         assert_eq!(
-            StdError::not_found("cw_multi_test::wasm::ContractData"),
+            StdError::not_found("terra_multi_test::wasm::ContractData"),
             err.downcast().unwrap()
         );
     }

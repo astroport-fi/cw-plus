@@ -430,7 +430,7 @@ mod tests {
     use cw2::{query_contract_info, ContractVersion};
     use cw4::{Cw4ExecuteMsg, Member};
     use cw4_group::helpers::Cw4GroupContract;
-    use cw_multi_test::{next_block, App, AppBuilder, Contract, ContractWrapper, Executor};
+    use terra_multi_test::{next_block, App, AppBuilder, Contract, ContractWrapper, Executor};
 
     use super::*;
     use crate::msg::Threshold;

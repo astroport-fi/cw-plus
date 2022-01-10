@@ -2,10 +2,11 @@ use std::fmt::{self, Debug};
 
 use cosmwasm_std::testing::{mock_env, MockApi, MockStorage};
 use cosmwasm_std::{
-    from_slice, to_vec, Addr, Api, Binary, BlockInfo, Coin, ContractResult, CosmosMsg, CustomQuery,
-    Empty, Querier, QuerierResult, QuerierWrapper, QueryRequest, Storage, SystemError,
-    SystemResult,
+    from_binary, from_slice, to_vec, Addr, AllBalanceResponse, Api, BankMsg, Binary, BlockInfo,
+    Coin, ContractResult, CosmosMsg, CustomQuery, Empty, Querier, QuerierResult, QuerierWrapper,
+    QueryRequest, Storage, SystemError, SystemResult, WasmMsg,
 };
+use cw0::NativeBalance;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -18,7 +19,7 @@ use crate::transactions::transactional;
 use crate::wasm::{ContractData, Wasm, WasmKeeper};
 use crate::BankKeeper;
 
-use anyhow::Result as AnyResult;
+use anyhow::{anyhow, Result as AnyResult};
 use derivative::Derivative;
 
 pub fn next_block(block: &mut BlockInfo) {
@@ -305,12 +306,72 @@ where
         sender: Addr,
         msg: CosmosMsg<ExecC>,
     ) -> AnyResult<AppResponse> {
+        self.check_coins(&msg)?;
+        self.charge_taxes(api, storage, &sender, &msg)?;
         match msg {
             CosmosMsg::Wasm(msg) => self.wasm.execute(api, storage, &self, block, sender, msg),
             CosmosMsg::Bank(msg) => self.bank.execute(storage, sender, msg),
-            CosmosMsg::Custom(msg) => self.custom.execute(api, storage, block, sender, msg),
+            CosmosMsg::Custom(msg) => self.custom.execute(self, api, storage, block, sender, msg),
             _ => unimplemented!(),
         }
+    }
+
+    fn check_coins(&self, msg: &CosmosMsg<ExecC>) -> AnyResult<()> {
+        let check_coins = match msg {
+            CosmosMsg::Wasm(WasmMsg::Instantiate { funds, .. })
+            | CosmosMsg::Wasm(WasmMsg::Execute { funds, .. }) => funds.clone(),
+            CosmosMsg::Bank(BankMsg::Send { amount, .. }) => amount.clone(),
+            _ => vec![],
+        };
+
+        let mut sorted_coins = check_coins.clone();
+        sorted_coins.sort_by(|l, r| l.denom.cmp(&r.denom));
+
+        for i in 0..check_coins.len() {
+            let check_coin = &check_coins[i];
+            let sorted_coin = &sorted_coins[i];
+            if check_coin.denom != sorted_coin.denom {
+                return Err(anyhow! {
+                    "Coins should be ordered by their denoms!".to_string()
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    fn charge_taxes(
+        &self,
+        api: &dyn Api,
+        storage: &mut dyn Storage,
+        sender: &Addr,
+        msg: &CosmosMsg<ExecC>,
+    ) -> AnyResult<()> {
+        let taxable_coins: Vec<Coin> = match msg {
+            // Actually multitest will make BankMsg::Send on instantiate or execute
+            /*CosmosMsg::Wasm(WasmMsg::Instantiate { funds, .. })
+            | CosmosMsg::Wasm(WasmMsg::Execute { funds, .. }) => funds.clone(),*/
+            CosmosMsg::Bank(BankMsg::Send { amount, .. }) => amount.clone(),
+            CosmosMsg::Custom(msg) => self.custom.get_taxable_coins(msg),
+            _ => vec![],
+        };
+
+        let taxes = self.custom.calculate_taxes(&taxable_coins)?;
+
+        let sender_balances: Vec<Coin> = from_binary::<AllBalanceResponse>(&self.bank.query(
+            api,
+            storage,
+            cosmwasm_std::BankQuery::AllBalances {
+                address: sender.to_string(),
+            },
+        )?)?
+        .amount;
+
+        let result_balances = (NativeBalance(sender_balances) - taxes)?.into_vec();
+
+        self.bank.init_balance(storage, sender, result_balances)?;
+
+        Ok(())
     }
 }
 
@@ -421,7 +482,7 @@ mod test {
         app.init_bank_balance(&rcpt, rcpt_funds).unwrap();
 
         // send both tokens
-        let to_send = vec![coin(30, "eth"), coin(5, "btc")];
+        let to_send = vec![coin(5, "btc"), coin(30, "eth")];
         let msg: CosmosMsg = BankMsg::Send {
             to_address: rcpt.clone().into(),
             amount: to_send,

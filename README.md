@@ -16,7 +16,7 @@
 | Utilities        | Crates.io                                                                                                                        | Docs                                                            |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------  | ----------------------------------------------------------------|
 | cw-controllers      | [![cw-controllers on crates.io](https://img.shields.io/crates/v/cw-controllers.svg)](https://crates.io/crates/cw-controllers)             | [![Docs](https://docs.rs/cw-controllers/badge.svg)](https://docs.rs/cw-controllers)    |
-| cw-multi-test       | [![cw-multi-test on crates.io](https://img.shields.io/crates/v/cw-multi-test.svg)](https://crates.io/crates/cw-multi-test)                | [![Docs](https://docs.rs/cw-multi-test/badge.svg)](https://docs.rs/cw-multi-test)    |
+| terra-multi-test       | Not published                | Not published    |
 | cw-storage-plus     | [![cw-storage-plus on crates.io](https://img.shields.io/crates/v/cw-storage-plus.svg)](https://crates.io/crates/cw-storage-plus)          | [![Docs](https://docs.rs/cw-storage-plus/badge.svg)](https://docs.rs/cw-storage-plus)    |
 
 | Contracts               | Download                                                                                                                      | Docs                                                                     |
